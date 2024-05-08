@@ -225,6 +225,35 @@ public:
         --size_;
     }
 
+    template <typename... Args>
+    T& EmplaceBack(Args&&... args) {
+        if (size_ == data_.Capacity()) {
+            RawMemory<T> copy(size_ == 0 ? 1 : size_ * 2);
+            new (&copy[size_]) T(std::forward<Args>(args)...);
+            if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
+                std::uninitialized_move_n(data_.GetAddress(), size_, copy.GetAddress());
+            } else {
+                std::uninitialized_copy_n(data_.GetAddress(), size_, copy.GetAddress());
+            }
+            std::destroy_n(data_.GetAddress(), size_);
+            data_.Swap(copy);
+        } else {
+            new (&data_[size_]) T(std::forward<Args>(args)...);
+        }
+        ++size_;
+        return data_[size_ - 1];
+    }
+
+    using iterator = T*;
+    using const_iterator = const T*;
+
+    iterator begin() noexcept;
+    iterator end() noexcept;
+    const_iterator begin() const noexcept;
+    const_iterator end() const noexcept;
+    const_iterator cbegin() const noexcept;
+    const_iterator cend() const noexcept;
+
 private:
     RawMemory<T> data_;
     size_t size_ = 0;
